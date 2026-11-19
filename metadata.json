@@ -1,0 +1,6 @@
+{
+  "name": "Probad Studio",
+  "description": "Google Sheets ও GitHub Actions-ভিত্তিক বাংলা প্রবাদ-প্রবচন Reels অটোমেশন স্টুডিও",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
