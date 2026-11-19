@@ -170,15 +170,19 @@ export async function runReelPipeline(options: {
       fs.unlinkSync(outputPath);
     }
 
-    await updateRenderLog(
-      log.id,
-      {
-        status: 'failed',
-        error_message: message,
-        duration_ms: durationMs,
-      },
-      options.mode === 'publish'
-    );
+    try {
+      await updateRenderLog(
+        log.id,
+        {
+          status: 'failed',
+          error_message: message,
+          duration_ms: durationMs,
+        },
+        options.mode === 'publish'
+      );
+    } catch (logErr) {
+      console.error('[scheduler] Failed writing failure log:', logErr);
+    }
 
     if (options.mode === 'publish') {
       try {
@@ -194,7 +198,12 @@ export async function runReelPipeline(options: {
   }
 }
 
-export function reloadCronScheduler(): { active: boolean; expression: string; timezone: string } {
+export function reloadCronScheduler(): {
+  active: boolean;
+  expression: string;
+  timezone: string;
+  error?: string;
+} {
   if (activeTask) {
     activeTask.stop();
     activeTask = null;
@@ -214,19 +223,31 @@ export function reloadCronScheduler(): { active: boolean; expression: string; ti
     console.warn(`[scheduler] Invalid cron expression "${expression}". Falling back to 0 9 * * *.`);
   }
 
-  activeTask = cron.schedule(
-    validExpr,
-    async () => {
-      console.log(`[scheduler] Triggering daily Bengali Proverb Reel job (${validExpr} ${timezone})...`);
-      try {
-        const res = await runReelPipeline({ mode: 'publish' });
-        console.log(`[scheduler] Published proverb #${res.proverb.id} -> FB Reel ID: ${res.fbReelId}`);
-      } catch (err) {
-        console.error('[scheduler] Daily Reel automation error:', err);
-      }
-    },
-    { timezone }
-  );
+  try {
+    activeTask = cron.schedule(
+      validExpr,
+      async () => {
+        console.log(`[scheduler] Triggering daily Bengali Proverb Reel job (${validExpr} ${timezone})...`);
+        try {
+          const res = await runReelPipeline({ mode: 'publish' });
+          console.log(`[scheduler] Published proverb #${res.proverb.id} -> FB Reel ID: ${res.fbReelId}`);
+        } catch (err) {
+          console.error('[scheduler] Daily Reel automation error:', err);
+        }
+      },
+      { timezone }
+    );
+  } catch (err) {
+    // An invalid timezone must not break settings saving: keep the previous schedule.
+    activeTask = null;
+    console.error(`[scheduler] Could not schedule cron with timezone "${timezone}":`, err);
+    return {
+      active: false,
+      expression: validExpr,
+      timezone: 'Asia/Dhaka',
+      error: `Invalid timezone "${timezone}" — schedule not started.`,
+    };
+  }
 
   return { active: true, expression: validExpr, timezone };
 }

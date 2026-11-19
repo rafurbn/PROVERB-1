@@ -2,6 +2,17 @@ import { CheckCircle2, Loader2, Save, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { StudioSettings } from '../types';
 
+const TIMEZONE_OPTIONS = [
+  'Asia/Dhaka',
+  'Asia/Kolkata',
+  'Asia/Karachi',
+  'Asia/Dubai',
+  'Asia/Singapore',
+  'Europe/London',
+  'America/New_York',
+  'UTC',
+];
+
 interface SettingsViewProps {
   settings: StudioSettings | null;
   onSaveSettings: (partial: Record<string, string>) => Promise<void>;
@@ -16,7 +27,6 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
     music_volume: '0.15',
     reel_hashtags: '#বাংলাপ্রবাদ #BengaliProverbs #BanglaQuotes #Reels',
     fb_page_id: '',
-    fb_page_access_token: '',
     cron_expression: '0 9 * * *',
     cron_timezone: 'Asia/Dhaka',
     cron_enabled: 'true',
@@ -35,7 +45,6 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
       music_volume: settings.music_volume || '0.15',
       reel_hashtags: settings.reel_hashtags || '',
       fb_page_id: settings.fb_page_id || '',
-      fb_page_access_token: '',
       cron_expression: settings.cron_expression || '0 9 * * *',
       cron_timezone: settings.cron_timezone || 'Asia/Dhaka',
       cron_enabled: settings.cron_enabled || 'true',
@@ -57,11 +66,7 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
         cron_timezone: form.cron_timezone,
         cron_enabled: form.cron_enabled,
       };
-      if (form.fb_page_access_token.trim()) {
-        payload.fb_page_access_token = form.fb_page_access_token.trim();
-      }
       await onSaveSettings(payload);
-      setForm((p) => ({ ...p, fb_page_access_token: '' }));
     } finally {
       setSaving(false);
     }
@@ -71,7 +76,7 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
     setTestingFb(true);
     setFbVerifiedInfo(null);
     try {
-      const res = await onTestFacebook(form.fb_page_id, form.fb_page_access_token);
+      const res = await onTestFacebook(form.fb_page_id, '');
       setFbVerifiedInfo(`সফলভাবে যাচাই হয়েছে: ${res.pageName || res.id}`);
     } finally {
       setTestingFb(false);
@@ -199,18 +204,23 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Page Access Token {settings?.fb_page_access_token_masked ? `(${settings.fb_page_access_token_masked})` : ''}
-            </label>
-            <input
-              type="password"
-              value={form.fb_page_access_token}
-              onChange={(e) => setForm((p) => ({ ...p, fb_page_access_token: e.target.value }))}
-              placeholder="নতুন টোকেন দিতে পেস্ট করুন..."
-              className="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg"
-            />
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">Page Access Token</label>
+            <div className="w-full px-3 py-2 text-sm border border-slate-200 bg-slate-50 rounded-lg text-slate-600 flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              {settings?.has_fb_token ? (
+                <span className="font-mono">{settings.fb_page_access_token_masked}</span>
+              ) : (
+                <span>.env ফাইলে FB_PAGE_ACCESS_TOKEN সেট করুন</span>
+              )}
+            </div>
           </div>
         </div>
+
+        <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 leading-relaxed">
+          নিরাপত্তার জন্য টোকেন আর ড্যাশবোর্ডে বা সার্ভারের JSON-এ সেভ হয় না। সার্ভারের{' '}
+          <code className="font-mono">.env</code> ফাইলে{' '}
+          <code className="font-mono">FB_PAGE_ACCESS_TOKEN</code> দিয়ে দিন এবং সার্ভার রিস্টার্ট করুন।
+        </p>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -247,12 +257,20 @@ export function SettingsView({ settings, onSaveSettings, onTestFacebook }: Setti
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">Timezone</label>
-            <input
-              type="text"
+            <select
               value={form.cron_timezone}
               onChange={(e) => setForm((p) => ({ ...p, cron_timezone: e.target.value }))}
-              className="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg"
-            />
+              className="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg bg-white"
+            >
+              {Boolean(form.cron_timezone) && !TIMEZONE_OPTIONS.includes(form.cron_timezone) && (
+                <option value={form.cron_timezone}>{form.cron_timezone}</option>
+              )}
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">অটো-শিডিউলার</label>

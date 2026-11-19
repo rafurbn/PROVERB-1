@@ -19,7 +19,7 @@ export async function isFfmpegAvailable(): Promise<boolean> {
   return cachedFfmpegAvailable;
 }
 
-export async function probeDuration(filePath: string): Promise<number> {
+export async function probeDuration(filePath: string): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync(
       'ffprobe',
@@ -35,9 +35,10 @@ export async function probeDuration(filePath: string): Promise<number> {
       { timeout: 10000 }
     );
     const parsed = parseFloat(stdout.trim());
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 12;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   } catch {
-    return 12;
+    // Unknown duration — callers must decide, never invent a value.
+    return null;
   }
 }
 
@@ -156,7 +157,7 @@ export function ensureDefaultMediaAssets(): Promise<void> {
             await generateVerticalClipFromImage(v.image, outPath, 12);
           }
           const stat = fs.statSync(outPath);
-          const dur = await probeDuration(outPath);
+          const dur = (await probeDuration(outPath)) ?? 0;
           addMediaAsset({
             type: 'video',
             filename: v.filename,
@@ -197,7 +198,7 @@ export function ensureDefaultMediaAssets(): Promise<void> {
             await generateAmbientTrack(outPath, m.freqs, 18);
           }
           const stat = fs.statSync(outPath);
-          const dur = await probeDuration(outPath);
+          const dur = (await probeDuration(outPath)) ?? 0;
           addMediaAsset({
             type: 'music',
             filename: m.filename,

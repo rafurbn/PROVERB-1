@@ -46,7 +46,10 @@ export function AutomationSetupView({
   }, [currentSheetUrl]);
 
   useEffect(() => {
-    fetch('/api/sheets/apps-script')
+    const secret = sessionStorage.getItem('probad_app_secret');
+    fetch('/api/sheets/apps-script', {
+      headers: secret ? { 'X-App-Secret': secret } : undefined,
+    })
       .then((r) => r.json())
       .then((d) => {
         setAppsScriptCode(d.appsScript || '');

@@ -162,6 +162,9 @@ export async function renderReelVideo(options: {
   const musicAsset = pickRandomAsset('music', options.musicAssetId);
 
   const voiceDur = await probeDuration(options.voiceoverPath);
+  if (voiceDur === null) {
+    throw new Error(`Could not read voiceover duration for ${options.voiceoverPath}.`);
+  }
   const targetDuration = Number(Math.max(10, Math.min(45, voiceDur + 2.4)).toFixed(2));
 
   const assFilename = `overlay_${options.proverb.id}_${Date.now()}.ass`;

@@ -1,10 +1,10 @@
 import { parse as parseCsv } from 'csv-parse/sync';
+import crypto from 'crypto';
 import 'dotenv/config';
 import express from 'express';
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
-import * as XLSX from 'xlsx';
 import { verifyFacebookCredentials } from './server/services/facebook.ts';
 import { testGoogleSheetConnection } from './server/services/googleSheets.ts';
 import { isAutomationBusy, reloadCronScheduler, runReelPipeline } from './server/services/scheduler.ts';
@@ -28,6 +28,15 @@ import {
 import type { ProverbStatus } from './server/types.ts';
 
 const PORT = Number(process.env.PORT) || 3000;
+const APP_SECRET = process.env.APP_SECRET?.trim() || '';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 const uploadMemory = multer({
   storage: multer.memoryStorage(),
@@ -94,6 +103,31 @@ function extractProverbColumns(row: Record<string, unknown>): {
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
+
+  // --- Authentication guard for every /api route (healthcheck stays public) ---
+  if (!APP_SECRET) {
+    if (IS_PRODUCTION) {
+      throw new Error(
+        'APP_SECRET is required in production. Set APP_SECRET in .env so that nobody can publish or edit proverbs without permission.'
+      );
+    }
+    console.warn(
+      '[security] APP_SECRET is not set. API is unprotected — this is only acceptable on localhost.'
+    );
+  }
+  const publicPaths = new Set(['/health', '/cron/publish']);
+  app.use('/api', (req, res, next) => {
+    if (!APP_SECRET || publicPaths.has(req.path)) {
+      next();
+      return;
+    }
+    const provided = String(req.header('x-app-secret') || '').trim();
+    if (!provided || !timingSafeEqualString(provided, APP_SECRET)) {
+      res.status(401).json({ error: 'Unauthorized: missing or invalid X-App-Secret header.' });
+      return;
+    }
+    next();
+  });
 
   void ensureDefaultMediaAssets();
   let schedulerStatus = reloadCronScheduler();
@@ -224,30 +258,26 @@ async function startServer() {
 
   app.post('/api/proverbs/bulk', uploadMemory.single('file'), async (req, res) => {
     if (!req.file) {
-      res.status(400).json({ error: 'অনুগ্রহ করে একটি CSV বা Excel (.xlsx/.xls) ফাইল আপলোড করুন।' });
+      res.status(400).json({ error: 'অনুগ্রহ করে একটি CSV (.csv) ফাইল আপলোড করুন।' });
       return;
     }
 
     try {
       const ext = path.extname(req.file.originalname).toLowerCase();
-      let rawRows: Array<Record<string, unknown>> = [];
-
-      if (ext === '.xlsx' || ext === '.xls') {
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const firstSheet = workbook.SheetNames[0];
-        if (firstSheet) {
-          rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheet], {
-            defval: '',
-          });
-        }
-      } else {
-        const content = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
-        rawRows = parseCsv(content, {
-          columns: true,
-          skip_empty_lines: true,
-          trim: true,
-        }) as Array<Record<string, unknown>>;
+      if (ext !== '.csv') {
+        res.status(400).json({
+          error:
+            'শুধু CSV (.csv) ফাইল সমর্থিত। Excel থেকে "Save as → CSV UTF-8" করে আপলোড করুন।',
+        });
+        return;
       }
+
+      const content = req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '');
+      const rawRows = parseCsv(content, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      }) as Array<Record<string, unknown>>;
 
       const parsedItems = rawRows
         .map(extractProverbColumns)
@@ -374,7 +404,7 @@ async function startServer() {
 
     const mediaType: 'video' | 'music' =
       req.body?.type === 'music' || req.file.mimetype.startsWith('audio/') ? 'music' : 'video';
-    const duration = await probeDuration(req.file.path);
+    const duration = (await probeDuration(req.file.path)) ?? 0;
 
     const asset = addMediaAsset({
       type: mediaType,
@@ -447,6 +477,8 @@ async function startServer() {
         googleTtsFallback: true,
         elevenLabsConfigured: Boolean(process.env.ELEVENLABS_API_KEY?.trim()),
         elevenLabsVoiceConfigured: Boolean(process.env.ELEVENLABS_VOICE_ID?.trim()),
+        fbTokenConfigured: Boolean(process.env.FB_PAGE_ACCESS_TOKEN?.trim()),
+        appSecretConfigured: Boolean(APP_SECRET),
       },
       scheduler: schedulerStatus,
     });
@@ -476,7 +508,11 @@ async function startServer() {
     }
 
     if (typeof body.fb_page_access_token === 'string' && body.fb_page_access_token.trim()) {
-      updates.fb_page_access_token = body.fb_page_access_token.trim();
+      res.status(400).json({
+        error:
+          'নিরাপত্তার জন্য Page Access Token এখন শুধু .env ফাইলের FB_PAGE_ACCESS_TOKEN থেকে পড়া হয়। ড্যাশবোর্ড থেকে টোকেন সেভ করা বন্ধ করা হয়েছে।',
+      });
+      return;
     }
 
     const updated = updateSettings(updates);
@@ -498,7 +534,7 @@ async function startServer() {
   app.post('/api/settings/test-fb', async (req, res) => {
     const s = getSettings();
     const pageId = String(req.body?.fb_page_id || s.fb_page_id || '').trim();
-    const token = String(req.body?.fb_page_access_token || s.fb_page_access_token || '').trim();
+    const token = String(req.body?.fb_page_access_token || '').trim();
     try {
       const verified = await verifyFacebookCredentials(pageId, token);
       res.json(verified);
@@ -552,7 +588,7 @@ async function startServer() {
     const provided = String(
       req.headers['x-cron-secret'] || req.query.secret || req.body?.secret || ''
     ).trim();
-    if (provided !== expected) {
+    if (!provided || !timingSafeEqualString(provided, expected)) {
       res.status(401).json({ error: 'Unauthorized cron trigger.' });
       return;
     }

@@ -31,6 +31,19 @@ import type {
 
 type ActiveTab = 'overview' | 'proverbs' | 'sheets' | 'media' | 'settings';
 
+const SECRET_KEY = 'probad_app_secret';
+
+/**
+ * Sends an X-App-Secret header with every API call when the operator supplied
+ * one at runtime (kept in sessionStorage by the unlock screen below).
+ */
+const appFetch = (input: string, init: RequestInit = {}): Promise<Response> => {
+  const secret = sessionStorage.getItem(SECRET_KEY);
+  const headers = new Headers(init.headers);
+  if (secret) headers.set('X-App-Secret', secret);
+  return fetch(input, { ...init, headers });
+};
+
 const NAV_ITEMS: Array<{ id: ActiveTab; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'ওভারভিউ', icon: LayoutDashboard },
   { id: 'proverbs', label: 'প্রবাদ তালিকা', icon: ListChecks },
@@ -63,6 +76,8 @@ export default function App() {
   const [submittingProverb, setSubmittingProverb] = useState(false);
 
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [needsSecret, setNeedsSecret] = useState(false);
+  const [secretInput, setSecretInput] = useState('');
 
   const showNotice = useCallback((type: 'success' | 'error', text: string) => {
     setNotice({ type, text });
@@ -74,12 +89,18 @@ export default function App() {
   const fetchAllData = useCallback(async () => {
     try {
       const [ovRes, prRes, mdRes, stRes, lgRes] = await Promise.all([
-        fetch('/api/overview'),
-        fetch('/api/proverbs'),
-        fetch('/api/media'),
-        fetch('/api/settings'),
-        fetch('/api/logs'),
+        appFetch('/api/overview'),
+        appFetch('/api/proverbs'),
+        appFetch('/api/media'),
+        appFetch('/api/settings'),
+        appFetch('/api/logs'),
       ]);
+
+      if (ovRes.status === 401) {
+        setNeedsSecret(true);
+        setLoading(false);
+        return;
+      }
 
       const [ov, pr, md, st, lg] = await Promise.all([
         ovRes.json(),
@@ -113,7 +134,7 @@ export default function App() {
     e.preventDefault();
     setSubmittingProverb(true);
     try {
-      const res = await fetch('/api/proverbs', {
+      const res = await appFetch('/api/proverbs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProverb),
@@ -135,7 +156,7 @@ export default function App() {
     id: number,
     updates: Partial<{ text_bn: string; meaning_bn: string; category: string; status: ProverbStatus }>
   ) => {
-    const res = await fetch(`/api/proverbs/${id}`, {
+    const res = await appFetch(`/api/proverbs/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -150,7 +171,7 @@ export default function App() {
   };
 
   const handleDeleteProverb = async (id: number) => {
-    const res = await fetch(`/api/proverbs/${id}`, { method: 'DELETE' });
+    const res = await appFetch(`/api/proverbs/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) {
       showNotice('error', data.error || 'মুছে ফেলা যায়নি');
@@ -163,7 +184,7 @@ export default function App() {
   const handleBulkUpload = async (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch('/api/proverbs/bulk', { method: 'POST', body: fd });
+    const res = await appFetch('/api/proverbs/bulk', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok) {
       showNotice('error', data.error || 'ফাইল ইম্পোর্ট ব্যর্থ');
@@ -179,7 +200,7 @@ export default function App() {
   const handleRenderPreview = async (proverbId?: number) => {
     setIsRendering(true);
     try {
-      const res = await fetch('/api/pipeline/preview', {
+      const res = await appFetch('/api/pipeline/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proverbId }),
@@ -199,7 +220,7 @@ export default function App() {
   const handlePublishNow = async (proverbId?: number) => {
     setIsPublishing(true);
     try {
-      const res = await fetch('/api/pipeline/publish', {
+      const res = await appFetch('/api/pipeline/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proverbId }),
@@ -216,7 +237,7 @@ export default function App() {
   };
 
   const handleSaveAndTestSheet = async (url: string) => {
-    const testRes = await fetch('/api/sheets/test', {
+    const testRes = await appFetch('/api/sheets/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
@@ -227,7 +248,7 @@ export default function App() {
       throw new Error(testData.error);
     }
 
-    const saveRes = await fetch('/api/settings', {
+    const saveRes = await appFetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ google_sheet_api_url: url }),
@@ -241,7 +262,7 @@ export default function App() {
   };
 
   const handleSyncLocalToSheet = async () => {
-    const res = await fetch('/api/sheets/sync-up', { method: 'POST' });
+    const res = await appFetch('/api/sheets/sync-up', { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
       showNotice('error', data.error || 'সিঙ্ক ব্যর্থ');
@@ -256,7 +277,7 @@ export default function App() {
     const fd = new FormData();
     fd.append('type', type);
     fd.append('file', file);
-    const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+    const res = await appFetch('/api/media/upload', { method: 'POST', body: fd });
     const data = await res.json();
     if (!res.ok) {
       showNotice('error', data.error || 'মিডিয়া আপলোড ব্যর্থ');
@@ -267,7 +288,7 @@ export default function App() {
   };
 
   const handleDeleteMedia = async (id: number) => {
-    const res = await fetch(`/api/media/${id}`, { method: 'DELETE' });
+    const res = await appFetch(`/api/media/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       showNotice('error', 'ফাইল মুছে ফেলা যায়নি');
       return;
@@ -277,7 +298,7 @@ export default function App() {
   };
 
   const handleSaveSettings = async (partial: Record<string, string>) => {
-    const res = await fetch('/api/settings', {
+    const res = await appFetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partial),
@@ -292,7 +313,7 @@ export default function App() {
   };
 
   const handleTestFacebook = async (pageId: string, token: string) => {
-    const res = await fetch('/api/settings/test-fb', {
+    const res = await appFetch('/api/settings/test-fb', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fb_page_id: pageId, fb_page_access_token: token }),
@@ -307,6 +328,46 @@ export default function App() {
   };
 
   const activeNavLabel = NAV_ITEMS.find((n) => n.id === activeTab)?.label || 'ওভারভিউ';
+
+  if (needsSecret) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            sessionStorage.setItem(SECRET_KEY, secretInput.trim());
+            setNeedsSecret(false);
+            setLoading(true);
+            void fetchAllData();
+          }}
+          className="bg-white border border-slate-200 rounded-xl p-6 w-full max-w-sm space-y-4"
+        >
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-slate-900" />
+            <h1 className="text-base font-bold text-slate-900">Probad Studio</h1>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            এই সার্ভারে একটি অ্যাক্সেস কী সেট করা আছে। চালিয়ে যেতে সেটি দিন।
+          </p>
+          <input
+            type="password"
+            required
+            autoFocus
+            value={secretInput}
+            onChange={(e) => setSecretInput(e.target.value)}
+            placeholder="APP_SECRET"
+            className="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+          />
+          <button
+            type="submit"
+            className="w-full px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 cursor-pointer"
+          >
+            প্রবেশ করুন
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex">

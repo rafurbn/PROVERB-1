@@ -122,6 +122,7 @@ function getDefaultSettings(): AutomationSettings {
       process.env.FB_PAGE_ID && process.env.FB_PAGE_ID !== 'YOUR_FACEBOOK_PAGE_ID'
         ? process.env.FB_PAGE_ID.trim()
         : '',
+    // Never persisted to studio-store.json — always sourced from the environment.
     fb_page_access_token:
       process.env.FB_PAGE_ACCESS_TOKEN &&
       process.env.FB_PAGE_ACCESS_TOKEN !== 'YOUR_LONG_LIVED_PAGE_ACCESS_TOKEN'
@@ -163,7 +164,7 @@ function readLocalStore(): LocalStoreData {
   }
   try {
     const raw = fs.readFileSync(STORE_PATH, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<LocalStoreData>;
+    const parsed = JSON.parse(raw) as Partial<LocalStoreData> & { settings?: Partial<AutomationSettings> };
     const defaults = getDefaultSettings();
     const mergedSettings: AutomationSettings = {
       ...defaults,
@@ -175,9 +176,8 @@ function readLocalStore(): LocalStoreData {
     if (!mergedSettings.fb_page_id && defaults.fb_page_id) {
       mergedSettings.fb_page_id = defaults.fb_page_id;
     }
-    if (!mergedSettings.fb_page_access_token && defaults.fb_page_access_token) {
-      mergedSettings.fb_page_access_token = defaults.fb_page_access_token;
-    }
+    // The token is env-only; drop any legacy plaintext copy left in the JSON file.
+    mergedSettings.fb_page_access_token = defaults.fb_page_access_token;
     return {
       nextProverbId: parsed.nextProverbId || (parsed.proverbs?.length || 0) + 1,
       nextMediaId: parsed.nextMediaId || (parsed.mediaAssets?.length || 0) + 1,
@@ -187,7 +187,17 @@ function readLocalStore(): LocalStoreData {
       renderLogs: Array.isArray(parsed.renderLogs) ? parsed.renderLogs : [],
       settings: mergedSettings,
     };
-  } catch {
+  } catch (err) {
+    const backupPath = `${STORE_PATH}.corrupt-${Date.now()}`;
+    try {
+      fs.copyFileSync(STORE_PATH, backupPath);
+      console.error(
+        `[store] studio-store.json is unreadable; original kept at ${backupPath}. Resetting local store.`,
+        err
+      );
+    } catch (copyErr) {
+      console.error('[store] studio-store.json is unreadable and backup failed:', copyErr);
+    }
     const init = createInitialStore();
     writeLocalStore(init);
     return init;
@@ -195,8 +205,13 @@ function readLocalStore(): LocalStoreData {
 }
 
 function writeLocalStore(data: LocalStoreData): void {
+  // Persist secrets-free data only: the Facebook token lives in .env, never on disk.
+  const safe: LocalStoreData = {
+    ...data,
+    settings: { ...data.settings, fb_page_access_token: '' },
+  };
   const tmpPath = `${STORE_PATH}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+  fs.writeFileSync(tmpPath, JSON.stringify(safe, null, 2), 'utf-8');
   fs.renameSync(tmpPath, STORE_PATH);
 }
 
@@ -214,7 +229,8 @@ export function updateSettings(partial: Partial<AutomationSettings>): Automation
   }
   store.settings = next;
   writeLocalStore(store);
-  return next;
+  // Return the live view (env token in place) even though it is not written to disk.
+  return { ...next, fb_page_access_token: getDefaultSettings().fb_page_access_token };
 }
 
 export function getStorageMode(): { mode: StorageMode; sheetUrl: string } {
@@ -426,9 +442,20 @@ export async function listRenderLogs(limit = 30): Promise<RenderLogItem[]> {
   const { mode, sheetUrl } = getStorageMode();
   if (mode === 'google-sheets') {
     const remoteLogs = await fetchGoogleSheetLogs(sheetUrl);
-    if (remoteLogs.length > 0 && localLogs.length === 0) {
-      return remoteLogs.slice(0, limit);
+    const merged = [...localLogs];
+    for (const log of remoteLogs) {
+      const dup =
+        merged.some((l) => l.id === log.id) ||
+        merged.some(
+          (l) =>
+            l.created_at === log.created_at &&
+            l.proverb_id === log.proverb_id &&
+            l.mode === log.mode
+        );
+      if (!dup) merged.push(log);
     }
+    merged.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id);
+    return merged.slice(0, limit);
   }
   return localLogs.slice(0, limit);
 }

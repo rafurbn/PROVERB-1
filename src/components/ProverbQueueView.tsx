@@ -142,18 +142,31 @@ export function ProverbQueueView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <a
-            href="/api/proverbs/sample-csv"
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 whitespace-nowrap shrink-0"
+          <button
+            type="button"
+            onClick={async () => {
+              const secret = sessionStorage.getItem('probad_app_secret');
+              const res = await fetch('/api/proverbs/sample-csv', {
+                headers: secret ? { 'X-App-Secret': secret } : undefined,
+              });
+              if (!res.ok) return;
+              const url = URL.createObjectURL(await res.blob());
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'bengali-proverbs-template.csv';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer whitespace-nowrap shrink-0"
           >
             <Download className="w-3.5 h-3.5" />
             নমুনা CSV
-          </a>
+          </button>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.xlsx,.xls"
+            accept=".csv,text/csv"
             onChange={handleBulkFile}
             className="hidden"
           />
@@ -168,7 +181,7 @@ export function ProverbQueueView({
             ) : (
               <Upload className="w-3.5 h-3.5" />
             )}
-            CSV / Excel আপলোড
+            CSV আপলোড
           </button>
 
           <button
@@ -212,7 +225,7 @@ export function ProverbQueueView({
           <div className="py-14 px-6 text-center">
             <p className="text-sm font-medium text-slate-800">কোনো প্রবাদ পাওয়া যায়নি</p>
             <p className="text-xs text-slate-500 mt-1">
-              নতুন প্রবাদ যোগ করুন অথবা CSV/Excel ফাইল দিয়ে একসাথে শত শত প্রবাদ ইম্পোর্ট করুন।
+              নতুন প্রবাদ যোগ করুন অথবা CSV ফাইল দিয়ে একসাথে শত শত প্রবাদ ইম্পোর্ট করুন।
             </p>
             <button
               type="button"
