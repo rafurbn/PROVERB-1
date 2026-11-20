@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 184" width="660" height="184" role="img" aria-label="RAFU FOLK">
+  <defs>
+    <linearGradient id="rfGlass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="45%" stop-color="#f4f7fb" stop-opacity="0.70"/>
+      <stop offset="100%" stop-color="#d3dfee" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="rfEdge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.60"/>
+    </linearGradient>
+    <linearGradient id="rfText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="52%" stop-color="#eef4fb"/>
+      <stop offset="100%" stop-color="#aebfd4"/>
+    </linearGradient>
+    <linearGradient id="rfGleam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="rfShadow" x="-20%" y="-40%" width="140%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.36"/>
+    </filter>
+    <clipPath id="rfClip">
+      <rect x="4" y="24" width="652" height="136" rx="68"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#rfShadow)">
+    <rect x="4" y="24" width="652" height="136" rx="68" fill="url(#rfGlass)"/>
+  </g>
+
+  <g clip-path="url(#rfClip)">
+    <path d="M70 40 H590 Q614 40 616 56 Q616 66 588 68 H72 Q44 68 44 54 Q44 40 70 40 Z" fill="#ffffff" fill-opacity="0.40"/>
+    <path d="M0 118 L660 96 L660 108 L0 130 Z" fill="url(#rfGleam)" fill-opacity="0.35"/>
+    <path d="M84 138 H576 Q600 138 600 126 Q600 118 574 118 H86 Q60 118 60 128 Q60 138 84 138 Z" fill="#ffffff" fill-opacity="0.22"/>
+  </g>
+
+  <rect x="5" y="25" width="650" height="134" rx="67" fill="none" stroke="url(#rfEdge)" stroke-width="2.6"/>
+
+  <text x="330" y="114" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif" font-size="60" font-weight="800" letter-spacing="11" fill="url(#rfText)" stroke="#ffffff" stroke-opacity="0.40" stroke-width="1.2">RAFU FOLK</text>
+</svg>

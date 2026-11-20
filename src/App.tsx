@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  BookOpen,
   CheckCircle2,
   Clock,
   FileSpreadsheet,
@@ -15,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import rafuFolkLogoUrl from './assets/logo/rafu-folk-logo.svg';
 import { AutomationSetupView } from './components/AutomationSetupView';
 import { MediaLibraryView } from './components/MediaLibraryView';
 import { ProverbQueueView } from './components/ProverbQueueView';
@@ -342,8 +342,8 @@ export default function App() {
           }}
           className="bg-white border border-slate-200 rounded-xl p-6 w-full max-w-sm space-y-4"
         >
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-slate-900" />
+          <div className="flex items-center gap-2.5">
+            <img src={rafuFolkLogoUrl} alt="RAFU FOLK" className="h-8 w-auto shrink-0" />
             <h1 className="text-base font-bold text-slate-900">Probad Studio</h1>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
@@ -374,8 +374,12 @@ export default function App() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 bg-white border-r border-slate-200">
         <div className="h-16 px-5 border-b border-slate-200 flex items-center gap-2.5">
-          <BookOpen className="w-5 h-5 text-slate-900 shrink-0" />
-          <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap">
+          <img
+            src={rafuFolkLogoUrl}
+            alt="RAFU FOLK"
+            className="h-7 w-auto shrink-0"
+          />
+          <span className="text-[11px] font-semibold tracking-wide text-slate-500 whitespace-nowrap">
             Probad Studio
           </span>
         </div>
@@ -426,8 +430,8 @@ export default function App() {
             onClick={() => setMobileMenuOpen(false)}
           />
           <aside className="relative w-64 bg-white h-full border-r border-slate-200 flex flex-col z-10">
-            <div className="h-16 px-5 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-base font-bold text-slate-900">Probad Studio</span>
+            <div className="h-16 px-5 border-b border-slate-200 flex items-center justify-between gap-2">
+              <img src={rafuFolkLogoUrl} alt="RAFU FOLK" className="h-7 w-auto shrink-0" />
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
@@ -475,6 +479,11 @@ export default function App() {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 text-sm min-w-0">
+              <img
+                src={rafuFolkLogoUrl}
+                alt="RAFU FOLK"
+                className="h-6 w-auto shrink-0 rounded-md hidden sm:block"
+              />
               <span className="text-slate-400 hidden sm:inline whitespace-nowrap">Probad Studio</span>
               <span className="text-slate-300 hidden sm:inline">/</span>
               <h1 className="font-semibold text-slate-900 truncate">{activeNavLabel}</h1>

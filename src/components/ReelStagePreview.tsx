@@ -15,6 +15,8 @@ const BACKDROP_OPTIONS = [
   },
 ];
 
+const RAFU_FOLK_LOGO_SRC = '/assets/brand/rafu-folk-logo.svg';
+
 interface ReelStagePreviewProps {
   proverb: ProverbItem | null;
   settings: StudioSettings | null;
@@ -143,9 +145,9 @@ export function ReelStagePreview({
               )}
             </div>
 
-            <div className="absolute bottom-7 inset-x-0 text-center z-10 pointer-events-none">
-              <span className="text-[10px] tracking-wide text-white/60">
-                বাংলা প্রবাদ-প্রবচন
+            <div className="absolute bottom-7 inset-x-0 flex justify-center z-10 pointer-events-none">
+              <span className="reel-watermark-logo w-[62%] max-w-[170px]" aria-label="RAFU FOLK">
+                <img src={RAFU_FOLK_LOGO_SRC} alt="RAFU FOLK" className="relative block h-auto w-full opacity-80" />
               </span>
             </div>
           </>

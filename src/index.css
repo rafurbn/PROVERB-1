@@ -16,3 +16,41 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Glassy, liquid-looking brand watermark used on the 9:16 reel stage.
+   Matches the FFmpeg render (soft white glow + inner specular sheen). */
+.reel-watermark-logo {
+  position: relative;
+  display: block;
+  opacity: 0.82;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+.reel-watermark-logo img {
+  filter: saturate(0.92);
+}
+
+.reel-watermark-logo::before {
+  content: '';
+  position: absolute;
+  inset: -14% -8%;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.reel-watermark-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 42%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, 0.22) 100%);
+  -webkit-mask-image: url('/assets/brand/rafu-folk-logo.svg');
+  mask-image: url('/assets/brand/rafu-folk-logo.svg');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}

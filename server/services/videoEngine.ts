@@ -8,6 +8,26 @@ import { DIRS, getMediaAssetById, listMediaAssets } from './store.ts';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Brand watermark ("RAFU FOLK") burnt into every rendered reel.
+ * Sits inside the Facebook Reels safe zone, above the bottom UI chrome.
+ */
+export const BRAND_LOGO_PUBLIC_PATH = '/assets/brand/rafu-folk-logo-dark.png';
+const BRAND_LOGO_WIDTH = 620;
+const BRAND_LOGO_OVERLAY_Y = 1680;
+
+/**
+ * FFmpeg on CI (and most builds) has no SVG decoder, so the burnt-in
+ * watermark uses the pre-rendered PNG raster of the same artwork.
+ */
+export function resolveBrandLogoPath(): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), 'public', 'assets', 'brand', 'rafu-folk-logo-dark.png'),
+    path.resolve(process.cwd(), 'dist', 'assets', 'brand', 'rafu-folk-logo-dark.png'),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
 function hexToAssColor(hex: string, alphaHex = '00'): string {
   const clean = hex.replace('#', '').trim();
   if (clean.length !== 6) return `&H${alphaHex}FFFFFF`;
@@ -161,6 +181,8 @@ export async function renderReelVideo(options: {
   const videoAsset = pickRandomAsset('video', options.videoAssetId);
   const musicAsset = pickRandomAsset('music', options.musicAssetId);
 
+  const logoPath = resolveBrandLogoPath();
+
   const voiceDur = await probeDuration(options.voiceoverPath);
   if (voiceDur === null) {
     throw new Error(`Could not read voiceover duration for ${options.voiceoverPath}.`);
@@ -182,8 +204,20 @@ export async function renderReelVideo(options: {
 
   const relAssPath = path.relative(process.cwd(), assPath).replace(/\\/g, '/').replace(/:/g, '\\:');
   const fadeOutStart = Math.max(1, Number((targetDuration - 1.8).toFixed(2)));
+  const logoFadeOutStart = Math.max(0.5, Number((targetDuration - 0.9).toFixed(2)));
+  const watermarkChain = logoPath
+    ? `,format=rgba,split[logoCore][logoGlowSrc];` +
+      `[logoGlowSrc]gblur=sigma=14,colorchannelmixer=aa=0.55[logoGlow];` +
+      `[logoCore][logoGlow]overlay=(W-w)/2:(H-h)/2,format=rgba,fade=t=in:st=0.25:d=0.9:alpha=1,fade=t=out:st=${logoFadeOutStart}:d=0.9:alpha=1[wm]`
+    : '';
   const filterComplex = [
-    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,drawbox=x=0:y=0:w=iw:h=ih:color=black@${overlayOpacity}:t=fill,ass='${relAssPath}'[vout]`,
+    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,drawbox=x=0:y=0:w=iw:h=ih:color=black@${overlayOpacity}:t=fill,ass='${relAssPath}'[base]`,
+    ...(logoPath
+      ? [
+          `[3:v]fps=30,scale=${BRAND_LOGO_WIDTH}:${Math.round((BRAND_LOGO_WIDTH * 184) / 660)}${watermarkChain}`,
+          `[base][wm]overlay=x=(W-w)/2:y=${BRAND_LOGO_OVERLAY_Y}:format=auto,format=yuv420p[vout]`,
+        ]
+      : [`[base]null[vout]`]),
     `[1:a]adelay=600|600,apad=whole_dur=${targetDuration},volume=1.0[voice]`,
     `[2:a]atrim=0:${targetDuration},asetpts=PTS-STARTPTS,volume=${musicVol},afade=t=in:st=0:d=1.0,afade=t=out:st=${fadeOutStart}:d=1.8[bgm]`,
     `[voice][bgm]amix=inputs=2:duration=first:normalize=0[aout]`,
@@ -208,6 +242,7 @@ export async function renderReelVideo(options: {
         '-1',
         '-i',
         musicAsset.file_path,
+        ...(logoPath ? ['-loop', '1', '-i', logoPath] : []),
         '-filter_complex',
         filterComplex,
         '-map',
