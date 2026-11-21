@@ -8,10 +8,10 @@ const run = promisify(execFile);
 const fontsDir = path.resolve('public/assets/fonts').replace(/\\/g, '/').replace(/:/g, '\\:');
 
 const lines: Array<[string, number, string, number]> = [
-  ['kicker', 44, '\\H00E5E7EB', 220],
-  ['proverb', 66, '\\H00FFFFFF', 420],
-  ['meaning', 42, '\\H0000D7F5', 580],
-  ['brand', 40, '\\H00FFFFFF', 720],
+  ['kicker', 44, '&H00E5E7EB', 220],
+  ['proverb', 66, '&H00FFFFFF', 420],
+  ['meaning', 42, '&H0000D7F5', 580],
+  ['brand', 40, '&H00FFFFFF', 720],
 ];
 const texts: Record<string, string> = {
   kicker: 'জ্ঞান ও শিক্ষা',
@@ -33,7 +33,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: S,Noto Sans Bengali,${size},${color.replace(/\\/g, '&')},&H000000FF,&HCC000000,&H00000000,0,0,0,0,100,100,0,0,1,3,1.5,5,80,120,80,1
+Style: S,Noto Sans Bengali,${size},${color},&H000000FF,&HCC000000,&H00000000,0,0,0,0,100,100,0,0,1,3,1.5,5,80,120,80,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
