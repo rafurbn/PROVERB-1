@@ -13,8 +13,11 @@ const execFileAsync = promisify(execFile);
  * Sits inside the Facebook Reels safe zone, above the bottom UI chrome.
  */
 export const BRAND_LOGO_PUBLIC_PATH = '/assets/brand/rafu-folk-logo-dark.png';
-const BRAND_LOGO_WIDTH = 620;
-const BRAND_LOGO_OVERLAY_Y = 1680;
+const BRAND_LOGO_WIDTH = 580;
+// Plated tile is ~204px tall (580x162 logo + 28/20 padding). y=1596 puts its
+// bottom edge at 1800, inside the Reels safe zone (bottom UI chrome ~1900 on a
+// 1920 canvas) while staying clear of the brand line at y=1520.
+const BRAND_LOGO_OVERLAY_Y = 1596;
 
 /**
  * FFmpeg on CI (and most builds) has no SVG decoder, so the burnt-in
@@ -121,17 +124,17 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Kicker,Noto Sans Bengali,30,&H00D4D4D8,&H000000FF,&H80000000,&H00000000,1,0,0,0,100,100,2,0,1,2,1,5,80,120,80,1
-Style: Proverb,Noto Sans Bengali,${proverbFontSize},${primaryAss},&H000000FF,&HAA000000,&H64000000,1,0,0,0,100,100,0,0,1,3.5,2.5,5,80,120,80,1
-Style: Meaning,Noto Sans Bengali,${meaningFontSize},${meaningAss},&H000000FF,&HAA000000,&H64000000,0,0,0,0,100,100,0,0,1,2.8,2,5,80,120,80,1
-Style: Brand,Noto Sans Bengali,28,&H33FFFFFF,&H000000FF,&H60000000,&H00000000,0,0,0,0,100,100,1,0,1,1.5,0,5,80,120,80,1
+Style: Kicker,Noto Sans Bengali,44,&H00E5E7EB,&H000000FF,&HCC000000,&H00000000,0,0,0,0,100,100,0,0,1,3,1.5,5,80,120,80,1
+Style: Proverb,Noto Sans Bengali,${proverbFontSize},${primaryAss},&H000000FF,&HAA000000,&H64000000,0,0,0,0,100,100,0,0,1,3.5,2.5,5,80,120,80,1
+Style: Meaning,Noto Sans Bengali,${meaningFontSize},${meaningAss},&H000000FF,&HBB000000,&H64000000,0,0,0,0,100,100,0,0,1,3,2,5,80,120,80,1
+Style: Brand,Noto Sans Bengali,40,&H00FFFFFF,&H000000FF,&HCC000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,5,80,120,80,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.15,${endTime},Kicker,,0,0,0,,{\\an5\\pos(${centerX},${kickerY})\\fad(600,400)}${categoryEscaped}
 Dialogue: 1,0:00:00.25,${endTime},Proverb,,0,0,0,,{\\an5\\pos(${centerX},${proverbCenterY})\\fad(800,400)}${proverbEscaped}
 Dialogue: 2,0:00:00.90,${endTime},Meaning,,0,0,0,,{\\an5\\pos(${centerX},${meaningCenterY})\\fad(850,400)}${meaningEscaped}
-Dialogue: 0,0:00:00.40,${endTime},Brand,,0,0,0,,{\\an5\\pos(${centerX},1560)\\fad(600,400)}বাংলা প্রবাদ-প্রবচন
+Dialogue: 0,0:00:00.40,${endTime},Brand,,0,0,0,,{\\an5\\pos(${centerX},1520)\\fad(600,400)}বাংলা প্রবাদ-প্রবচন
 `;
 }
 
@@ -203,15 +206,20 @@ export async function renderReelVideo(options: {
   const overlayOpacity = Math.max(0, Math.min(0.85, parseFloat(options.settings.overlay_opacity) || 0.54));
 
   const relAssPath = path.relative(process.cwd(), assPath).replace(/\\/g, '/').replace(/:/g, '\\:');
+  // Bundle the Bengali font with the project so ASS rendering never falls back
+  // to a Latin-only system font (which renders tofu boxes).
+  const bundledFontsDir = path.join(process.cwd(), 'public', 'assets', 'fonts');
+  const assFontsDir = fs.existsSync(bundledFontsDir)
+    ? `:fontsdir='${bundledFontsDir.replace(/\\/g, '/').replace(/:/g, '\\:')}'`
+    : '';
   const fadeOutStart = Math.max(1, Number((targetDuration - 1.8).toFixed(2)));
   const logoFadeOutStart = Math.max(0.5, Number((targetDuration - 0.9).toFixed(2)));
   const watermarkChain = logoPath
-    ? `,format=rgba,split[logoCore][logoGlowSrc];` +
-      `[logoGlowSrc]gblur=sigma=14,colorchannelmixer=aa=0.55[logoGlow];` +
-      `[logoCore][logoGlow]overlay=(W-w)/2:(H-h)/2,format=rgba,fade=t=in:st=0.25:d=0.9:alpha=1,fade=t=out:st=${logoFadeOutStart}:d=0.9:alpha=1[wm]`
+    ? `,format=rgba,pad=iw+56:ih+40:28:20:color=0x0B1220EE,format=rgba,` +
+      `fade=t=in:st=0:d=0.35:alpha=1,fade=t=out:st=${logoFadeOutStart}:d=0.9:alpha=1[wm]`
     : '';
   const filterComplex = [
-    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,drawbox=x=0:y=0:w=iw:h=ih:color=black@${overlayOpacity}:t=fill,ass='${relAssPath}'[base]`,
+    `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,drawbox=x=0:y=0:w=iw:h=ih:color=black@${overlayOpacity}:t=fill,ass='${relAssPath}'${assFontsDir}[base]`,
     ...(logoPath
       ? [
           `[3:v]fps=30,scale=${BRAND_LOGO_WIDTH}:${Math.round((BRAND_LOGO_WIDTH * 184) / 660)}${watermarkChain}`,
