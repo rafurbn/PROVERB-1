@@ -3,7 +3,7 @@ name: Daily Bengali Proverb Reel Publisher
 on:
   schedule:
     # Runs every day at 09:00 AM Bangladesh Standard Time (03:00 UTC)
-    - cron: '37 2 * * *'
+    - cron: '37 7 * * *'
   workflow_dispatch:
     inputs:
       proverb_id:
